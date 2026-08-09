@@ -1,3 +1,4 @@
+import { AudioPlayback } from "@/components/audio-playback";
 import { Waveform } from "@/components/waveform";
 import type { Task, VoiceState } from "@/types/task";
 
@@ -6,6 +7,9 @@ type VoiceWorkspaceProps = {
   voiceState: VoiceState;
   resumeStep: number;
   correctionApplied: boolean;
+  recordedAudio: Blob | null;
+  recordingError: string | null;
+  isStoppingRecording: boolean;
   onBack: () => void;
   onFinishSpeaking: () => void;
   onInterrupt: () => void;
@@ -15,7 +19,7 @@ type VoiceWorkspaceProps = {
 
 const retrievalSteps = ["Task identified", "Previous progress found", "Relevant unresolved context found", "Continuation prepared"];
 
-export function VoiceWorkspace({ task, voiceState, resumeStep, correctionApplied, onBack, onFinishSpeaking, onInterrupt, onApplyCorrection, onRestart }: VoiceWorkspaceProps) {
+export function VoiceWorkspace({ task, voiceState, resumeStep, correctionApplied, recordedAudio, recordingError, isStoppingRecording, onBack, onFinishSpeaking, onInterrupt, onApplyCorrection, onRestart }: VoiceWorkspaceProps) {
   const speakingCopy = correctionApplied
     ? `Got it. PostgreSQL is confirmed. The next unresolved step is: ${task.correctedNextStep}`
     : task.voiceResponse;
@@ -29,12 +33,13 @@ export function VoiceWorkspace({ task, voiceState, resumeStep, correctionApplied
       <div className="voice-stage" aria-live="polite">
         {voiceState === "idle" && (
           <VoiceStateContent title="Ready when you are" subtitle="Start speaking to resume this task from its last useful point." active={false}>
-            <button className="button button-primary" onClick={onRestart}>Start speaking</button>
+            {recordingError && <p className="recording-error" role="alert">{recordingError}</p>}
+            <button className="button button-primary" onClick={onRestart}>{recordingError ? "Try microphone again" : "Start speaking"}</button>
           </VoiceStateContent>
         )}
         {voiceState === "listening" && (
           <VoiceStateContent title="Listening" subtitle="Tell Continue what you want to pick up, correct, or decide next." active>
-            <div className="voice-actions"><button className="button button-primary" onClick={onFinishSpeaking}>I&apos;m finished speaking</button><button className="button button-secondary" onClick={onBack}>Cancel</button></div>
+            <div className="voice-actions"><button className="button button-primary" onClick={onFinishSpeaking} disabled={isStoppingRecording}>{isStoppingRecording ? "Finishing recording..." : "I'm finished speaking"}</button><button className="button button-secondary" onClick={onBack}>Cancel</button></div>
           </VoiceStateContent>
         )}
         {voiceState === "processing" && (
@@ -52,6 +57,7 @@ export function VoiceWorkspace({ task, voiceState, resumeStep, correctionApplied
         {voiceState === "speaking" && (
           <VoiceStateContent title={correctionApplied ? "Updated continuation" : "Continuing from your last session"} subtitle={correctionApplied ? "Your local prototype state now reflects the correction." : "This response is presented as spoken context, not chat history."} active>
             <div className="spoken-response"><p className="response-label">Continue is speaking</p><p>“{speakingCopy}”</p></div>
+            <AudioPlayback source={recordedAudio} />
             <div className="voice-actions"><button className="button button-primary" onClick={onInterrupt}>Interrupt and correct</button><button className="button button-secondary" onClick={onRestart}>Start over</button></div>
           </VoiceStateContent>
         )}

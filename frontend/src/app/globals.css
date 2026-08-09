@@ -112,6 +112,10 @@ h3 { margin-bottom: 8px; font-size: 18px; line-height: 1.2; letter-spacing: -.02
 .spoken-response { max-width: 580px; padding: 24px; margin: 28px 0; border-left: 3px solid var(--accent); background: #f5f8f6; }
 .spoken-response p { margin-bottom: 0; font-size: 20px; line-height: 1.5; letter-spacing: -.02em; }
 .response-label { margin-bottom: 12px; color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.recording-error { max-width: 520px; padding: 12px 14px; margin: 0 0 18px; border-left: 3px solid #d39a60; color: #70441e; background: #fff9f3; font-size: 13px; line-height: 1.45; }
+.recording-playback { max-width: 580px; padding: 18px 20px; margin: -12px 0 28px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.recording-playback .response-label { margin-bottom: 10px; }
+.recording-playback audio { display: block; width: 100%; height: 36px; }
 .correction-quote { max-width: 560px; padding: 17px 19px; margin: 28px 0; border: 1px solid #ecd4bb; border-radius: 9px; color: #70441e; background: #fff9f3; font-size: 16px; line-height: 1.5; }
 .correction-quote strong { display: block; margin-bottom: 4px; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
 .correction-flow { display: grid; gap: 0; max-width: 560px; margin: 25px 0 31px; }
