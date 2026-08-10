@@ -1,119 +1,150 @@
-# Continue Where I Left Off — VoxForge prototype
+# Continuum — Never Start From Zero
 
-This repository contains a StarForge 2026 VoxForge prototype for an interview-preparation voice agent. It currently provides a safe, runnable integration foundation only; it does **not** send recordings, retrieve data, call an LLM, or synthesize speech yet.
+**StarForge 2026 — VoxForge**  
+**Team: Binary Brains**
 
-## Architecture
+Continuum is a voice-first AI experience designed to help users continue unfinished interactions without having to start from zero.
+
+Interview practice is the current demonstration use case.
+
+## The Problem
+
+Existing AI assistants can remember conversations, but users can still lose the useful context of an unfinished task and have to reconstruct what they were doing.
+
+Continuum focuses on preserving the **latest useful interaction context** so users can return and continue.
+
+## How It Works
 
 ```text
-Browser UI (frontend, Next.js)
-  -> /api/* same-origin request
-  -> Next.js rewrite (BACKEND_URL)
-  -> Node/TypeScript API (backend, Express)
-  -> provider wrappers (not invoked yet): Groq STT/LLM, Qdrant, Rime
+User speaks
+    ↓
+Groq Whisper
+Speech → Text
+    ↓
+Qdrant
+Relevant context retrieval
+    ↓
+GPT-OSS
+Response generation
+    ↓
+Rime
+Text → Speech
+    ↓
+User hears response
 
-Shared request/response contracts live in shared/interview.ts.
-```
+The voice interaction is turn-based:
 
-- `frontend/` remains the existing Next.js App Router prototype and contains browser-only UI/state.
-- `backend/` is an Express/TypeScript service. It owns provider configuration and all future calls to Groq, Qdrant, and Rime.
-- `shared/` contains data-only TypeScript contracts safe to import from either side. It must not contain backend implementation or secrets.
+Listening → Processing → Continuum speaking → Review → Your turn
 
-The backend exposes `GET /health` and placeholders for `POST /api/stt`, `POST /api/interview`, and `POST /api/tts`. The placeholders report missing configuration with `503`, or `501` when configured, and make no provider network calls.
+Qdrant provides relevant supporting context, while the application preserves the latest useful continuity state for future sessions.
 
-## Interview knowledge retrieval
+Technology Stack
+Frontend: Next.js, React, TypeScript
+Backend: Node.js, Express, TypeScript
+Speech-to-text: Groq Whisper (whisper-large-v3-turbo)
+LLM: Groq openai/gpt-oss-120b
+Retrieval: Qdrant
+Text-to-speech: Rime
+Continuity: Browser localStorage
 
-Qdrant now holds a small, synthetic interview-preparation dataset in the `interview_knowledge` collection. The Qdrant Cloud Inference model `sentence-transformers/all-MiniLM-L6-v2` creates the 384-dimensional `content` vector, so no additional embedding provider or key is required.
 
-Initialize or re-run the idempotent seed:
+Key Features
+Voice-based interaction
+Speech-to-text with Groq Whisper
+Relevant context retrieval with Qdrant
+Contextual response generation with GPT-OSS
+Rime-generated spoken responses
+Review screen after each completed turn
+Continue from the latest useful context
+Start a new chat without carrying forward previous context
 
-```bash
-cd backend
-npm run seed
-```
 
-Search the real collection through the backend:
+Repository Structure
+frontend/     Next.js / React application
+backend/      Node.js / TypeScript API
+shared/       Shared TypeScript contracts
 
-```bash
-curl -X POST http://localhost:4000/api/interview/search \
-  -H "Content-Type: application/json" \
-  -d '{"query":"How should I explain my biggest software project?"}'
-```
 
-The response is a `results` array containing text, similarity score, source, title, and category. This shape is the future LLM orchestration context; the LLM is not invoked by this endpoint.
+Local Setup
+Requirements
+Node.js 22+
+Groq API key
+Qdrant Cloud project/API key
+Rime API key
 
-## Interview intelligence
+1. Clone the repository
+git clone <YOUR_GITHUB_REPOSITORY_URL>
+cd <REPOSITORY_DIRECTORY>
 
-`POST /api/interview` accepts a required transcript plus optional `role` and `interviewType`. It retrieves the three most relevant `interview_knowledge` records, includes their actual content in the Groq `openai/gpt-oss-120b` request, and returns concise structured coaching with the Qdrant records the model identified as used.
+2. Configure the backend
 
-```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:4000/api/interview" -ContentType "application/json" -Body '{"transcript":"I built a stock analysis web application using Next.js and APIs. I worked on the frontend and connected several data sources.","role":"Software Engineering Intern","interviewType":"technical"}'
-```
+Create:
 
-The response includes `interviewerResponse`, `feedback`, a 1–10 `score` or `null`, and `retrievedContext` metadata. The endpoint does not invoke Rime or the frontend.
+backend/.env
 
-## Speech to text
+using:
 
-`POST /api/stt` accepts one `multipart/form-data` field named `audio`, keeps it in memory only for the request, and transcribes it through the server-side Groq SDK using `whisper-large-v3-turbo`. Supported formats are FLAC, MP3, MP4/M4A, OGG, WAV, and WebM. Uploads are limited to 20 MB.
+backend/.env.example
 
-With the backend running, test it with a local audio file:
+Add:
 
-```powershell
-curl.exe -X POST http://localhost:4000/api/stt -F "audio=@C:\path\to\recording.wav;type=audio/wav"
-```
-
-The endpoint returns `{ "transcript": "..." }`. It does not invoke the LLM or Rime.
-
-## Text to speech
-
-`POST /api/tts` accepts `{ "text": "..." }` and returns Rime-generated browser-playable WAV audio directly. The backend uses the server-only `RIME_API_KEY` with Rime's `arcana` model and `astra` speaker; no audio provider credential is sent to the browser.
-
-```powershell
-curl.exe -X POST http://localhost:4000/api/tts -H "Content-Type: application/json" -d "{\"text\":\"Let us continue with your interview answer.\"}" -o response.wav
-```
-
-## Environment variables
-
-Copy `backend/.env.example` to `backend/.env`, then add real values locally:
-
-```bash
 RIME_API_KEY=
 QDRANT_URL=
 QDRANT_API_KEY=
 LLM_API_KEY=
 STT_API_KEY=
-```
 
-`LLM_API_KEY` and `STT_API_KEY` configure separate Groq SDK clients for the planned `openai/gpt-oss-120b` and `whisper-large-v3-turbo` calls. `RIME_API_KEY` is retained exclusively in the backend's future REST wrapper, which will use Node's built-in `fetch`; Qdrant uses the official JavaScript client.
+PORT=4000
+FRONTEND_ORIGIN=http://localhost:3000
 
-Optionally copy `frontend/.env.example` to `frontend/.env.local` and set `BACKEND_URL` if the backend is not at `http://localhost:4000`. This setting is only a rewrite destination—never put provider keys in frontend variables, especially not `NEXT_PUBLIC_*` variables.
+Never commit the real .env file.
 
-`.env` files are Git-ignored. Never commit API keys, tokens, recordings, or other sensitive interview data.
-
-## Run locally
-
-Use Node 22 or later.
-
-In one terminal:
-
-```bash
+3. Start the backend
 cd backend
 npm install
 npm run dev
-```
 
-In another terminal:
+Backend:
 
-```bash
+http://localhost:4000
+
+Health check:
+
+http://localhost:4000/health
+4. Start the frontend
+
+Open another terminal:
+
 cd frontend
 npm install
 npm run dev
-```
 
-Open `http://localhost:3000`. To verify the API foundation directly, request `http://localhost:4000/health`.
+Open:
 
-## Checks
+http://localhost:3000
+Qdrant Knowledge Base
 
-```bash
+The prototype uses a small synthetic interview-preparation dataset in Qdrant.
+
+To seed the collection:
+
+cd backend
+npm run seed
+
+The retrieval endpoint can be tested with:
+
+POST /api/interview/search
+API
+Endpoint	Purpose
+GET /health	Backend health check
+POST /api/stt	Speech → transcript
+POST /api/interview/search	Qdrant retrieval
+POST /api/interview	Context retrieval + GPT-OSS response
+POST /api/tts	Text → Rime speech
+Validation
+
+The project has been validated with:
+
 cd backend
 npm run typecheck
 npm run build
@@ -121,8 +152,36 @@ npm run build
 cd ../frontend
 npm run lint
 npm run build
-```
 
-## Deliberate scope boundary
+The local end-to-end flow has also been tested:
 
-The complete microphone → STT → retrieval → interview orchestration → LLM → Rime TTS flow is intentionally not implemented. Before adding it, agree and document the API payloads, audio upload format, Qdrant collection/schema and retrieval semantics, conversation/session state, failure behavior, and provider response handling.
+Microphone
+   ↓
+Groq Whisper
+   ↓
+Qdrant
+   ↓
+GPT-OSS
+   ↓
+Rime
+   ↓
+Browser audio
+
+
+Security
+API keys remain server-side.
+.env files are Git-ignored.
+.env.example contains no secrets.
+Provider keys are never exposed through NEXT_PUBLIC_* variables.
+The interview knowledge dataset is synthetic.
+Current Scope
+
+Continuum is a working prototype, not a production multi-user system.
+
+The current implementation preserves the latest useful interaction context. Future versions could add persistent accounts, richer task memory, additional task types, and production-scale multi-user storage.
+
+Team
+
+Binary Brains
+Project: Continuum
+Track: StarForge 2026 — VoxForge

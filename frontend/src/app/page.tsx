@@ -484,8 +484,8 @@ export default function Home() {
             <div className="home-actions">
               {continuity ? (
                 <>
-                  <button className="button button-primary" onClick={continuePreviousInterview}>Start New Chat <span aria-hidden="true">→</span></button>
-                  <button className="button button-secondary" onClick={() => startNewInterview()}>Start New Interview</button>
+                  <button className="button button-primary" onClick={continuePreviousInterview}>Continue Where I Left Off <span aria-hidden="true">→</span></button>
+                  <button className="button button-secondary" onClick={() => startNewInterview()}>Start New Chat</button>
                 </>
               ) : (
                 <button className="button button-primary" onClick={() => startNewInterview()}>Start New Interview <span aria-hidden="true">→</span></button>
