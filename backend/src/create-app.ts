@@ -59,7 +59,7 @@ export function createApp() {
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
 
-  // Instantiate only configured clients. This validates constructor configuration
+  // Instantiate only configured clients when the app is created. This validates constructor configuration
   // without making provider network calls during startup or health checks.
   createProviderClients();
 
