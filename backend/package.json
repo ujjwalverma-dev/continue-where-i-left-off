@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --watch --import tsx src/server.ts",
+    "dev": "node --env-file-if-exists=.env --watch --import tsx src/local-server.ts",
     "build": "tsc --project tsconfig.json",
-    "start": "node --env-file-if-exists=.env dist/backend/src/server.js",
+    "start": "node --env-file-if-exists=.env dist/backend/src/local-server.js",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "seed": "node --env-file-if-exists=.env --import tsx src/seed.ts"
   },
