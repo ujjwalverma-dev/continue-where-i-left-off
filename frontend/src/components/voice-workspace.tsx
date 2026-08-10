@@ -5,67 +5,81 @@ import type { Task, VoiceState } from "@/types/task";
 type VoiceWorkspaceProps = {
   task: Task;
   voiceState: VoiceState;
-  resumeStep: number;
-  correctionApplied: boolean;
-  recordedAudio: Blob | null;
-  recordingError: string | null;
+  transcript: string | null;
+  feedback: string | null;
+  score: number | null;
+  interviewerResponse: string | null;
+  responseAudio: Blob | null;
+  voiceError: string | null;
+  ttsError: string | null;
+  autoplayBlocked: boolean;
   isStoppingRecording: boolean;
+  isContinuing: boolean;
   onBack: () => void;
+  onStartNew: () => void;
   onFinishSpeaking: () => void;
-  onInterrupt: () => void;
-  onApplyCorrection: () => void;
   onRestart: () => void;
+  onRetryAudio: () => void;
+  onAutoplayBlocked: () => void;
+  onAudioEnded: () => void;
+  onSaveAndExit: () => void;
 };
 
-const retrievalSteps = ["Task identified", "Previous progress found", "Relevant unresolved context found", "Continuation prepared"];
-
-export function VoiceWorkspace({ task, voiceState, resumeStep, correctionApplied, recordedAudio, recordingError, isStoppingRecording, onBack, onFinishSpeaking, onInterrupt, onApplyCorrection, onRestart }: VoiceWorkspaceProps) {
-  const speakingCopy = correctionApplied
-    ? `Got it. PostgreSQL is confirmed. The next unresolved step is: ${task.correctedNextStep}`
-    : task.voiceResponse;
-
+export function VoiceWorkspace({ task, voiceState, transcript, feedback, score, interviewerResponse, responseAudio, voiceError, ttsError, autoplayBlocked, isStoppingRecording, isContinuing, onBack, onStartNew, onFinishSpeaking, onRestart, onRetryAudio, onAutoplayBlocked, onAudioEnded, onSaveAndExit }: VoiceWorkspaceProps) {
   return (
     <section className="voice-view" aria-labelledby="voice-title">
       <div className="voice-topline">
-        <button className="back-button" onClick={onBack}>← Task context</button>
-        <p className="voice-task"><strong>{task.title}</strong> · {task.progress}% complete</p>
+        <button className="back-button" onClick={onBack}>← Interview practice</button>
+        <p className="voice-task"><strong>{task.title}</strong> · {task.role} · {task.interviewType}</p>
       </div>
       <div className="voice-stage" aria-live="polite">
         {voiceState === "idle" && (
-          <VoiceStateContent title="Ready when you are" subtitle="Start speaking to resume this task from its last useful point." active={false}>
-            {recordingError && <p className="recording-error" role="alert">{recordingError}</p>}
-            <button className="button button-primary" onClick={onRestart}>{recordingError ? "Try microphone again" : "Start speaking"}</button>
+          <VoiceStateContent title="Your turn" subtitle="Speak when you are ready. Continuum will respond after you finish your answer." status="Ready" isContinuing={isContinuing} active={false}>
+            {voiceError && <p className="recording-error" role="alert">{voiceError}</p>}
+            <div className="voice-actions"><button className="button button-primary" onClick={onRestart}>Speak</button><button className="button button-secondary" onClick={onStartNew}>Start New Interview</button></div>
           </VoiceStateContent>
         )}
         {voiceState === "listening" && (
-          <VoiceStateContent title="Listening" subtitle="Tell Continue what you want to pick up, correct, or decide next." active>
-            <div className="voice-actions"><button className="button button-primary" onClick={onFinishSpeaking} disabled={isStoppingRecording}>{isStoppingRecording ? "Finishing recording..." : "I'm finished speaking"}</button><button className="button button-secondary" onClick={onBack}>Cancel</button></div>
-          </VoiceStateContent>
-        )}
-        {voiceState === "processing" && (
-          <VoiceStateContent title="Preparing your continuation" subtitle="Matching your request with the unfinished task context." active>
-            <div className="prototype-notice"><span aria-hidden="true">i</span><span>This is a local prototype transition. No voice, retrieval, or external service is connected.</span></div>
-          </VoiceStateContent>
-        )}
-        {voiceState === "resuming" && (
-          <VoiceStateContent title="Finding the right place to continue" subtitle="A short visual summary of the context being prepared." active={false}>
-            <div className="resume-list" aria-label="Simulated context retrieval progress">
-              {retrievalSteps.map((step, index) => <div className={`resume-item ${index <= resumeStep ? "done" : ""}`} key={step}><span>{index <= resumeStep ? "✓" : index + 1}</span>{step}</div>)}
+          <VoiceStateContent title="Listening" subtitle="Answer as you would in the interview. Stop when you are finished." status="Listening" isContinuing={isContinuing} active>
+            <div className="voice-actions">
+              <button className="button button-primary" onClick={onFinishSpeaking} disabled={isStoppingRecording}>{isStoppingRecording ? "Finishing recording..." : "I'm finished speaking"}</button>
+              <button className="button button-secondary" onClick={onBack}>Cancel</button>
             </div>
           </VoiceStateContent>
         )}
-        {voiceState === "speaking" && (
-          <VoiceStateContent title={correctionApplied ? "Updated continuation" : "Continuing from your last session"} subtitle={correctionApplied ? "Your local prototype state now reflects the correction." : "This response is presented as spoken context, not chat history."} active>
-            <div className="spoken-response"><p className="response-label">Continue is speaking</p><p>“{speakingCopy}”</p></div>
-            <AudioPlayback source={recordedAudio} />
-            <div className="voice-actions"><button className="button button-primary" onClick={onInterrupt}>Interrupt and correct</button><button className="button button-secondary" onClick={onRestart}>Start over</button></div>
+        {voiceState === "processing" && (
+          <VoiceStateContent title="Processing" subtitle="Transcribing your recording and preparing feedback and the next response." status="Processing" isContinuing={isContinuing} active>
+            <div className="prototype-notice"><span aria-hidden="true">i</span><span>Continuum is preparing its response for this completed turn.</span></div>
           </VoiceStateContent>
         )}
-        {voiceState === "interrupted" && (
-          <VoiceStateContent title="Correction received" subtitle="The user can change the course before the continuation proceeds." active={false}>
-            <blockquote className="correction-quote"><strong>You said</strong>“{task.correction}”</blockquote>
-            <div className="correction-flow" aria-label="Simulated correction flow"><div className="flow-item"><div className="flow-line"><span className="flow-dot" /></div><span>User correction received</span></div><div className="flow-item"><div className="flow-line"><span className="flow-dot" /></div><span>Task memory updated <span className="inline-status">(local prototype)</span></span></div><div className="flow-item"><div className="flow-line"><span className="flow-dot" /></div><span>Next unresolved step identified</span></div></div>
-            <div className="voice-actions"><button className="button button-primary" onClick={onApplyCorrection}>Continue with correction</button><button className="button button-secondary" onClick={onRestart}>Keep listening</button></div>
+        {(voiceState === "speaking" || voiceState === "review") && (
+          <VoiceStateContent
+            title={voiceState === "review" ? "Ready for your next answer" : "Continuum is responding"}
+            subtitle={voiceState === "review" ? "Review the response, feedback, and audio. Answer when you are ready." : "Your feedback and the next question are ready. Listen, then take your turn."}
+            status={voiceState === "review" ? "Your turn" : "Continuum speaking"}
+            isContinuing={isContinuing}
+            active={voiceState === "speaking"}
+          >
+            {interviewerResponse && <div className="spoken-response"><p className="response-label">Continuum says</p><p>“{interviewerResponse}”</p></div>}
+            <div className="interview-details">
+              {transcript && <article><p className="response-label">Your transcript</p><p>{transcript}</p></article>}
+              {feedback && <article><p className="response-label">Coach feedback{score ? ` · ${score}/10` : ""}</p><p>{feedback}</p></article>}
+            </div>
+            <AudioPlayback source={responseAudio} autoPlay onAutoplayBlocked={onAutoplayBlocked} onEnded={onAudioEnded} />
+            {autoplayBlocked && <p className="recording-error">Autoplay was blocked. Use the player above to hear the response.</p>}
+            {ttsError && <p className="recording-error">{ttsError}</p>}
+            <div className="voice-actions">
+              {ttsError && interviewerResponse && <button className="button button-secondary" onClick={onRetryAudio}>Retry audio</button>}
+              <button className="button button-primary" onClick={onRestart}>Answer the next question <span aria-hidden="true">→</span></button>
+              {voiceState === "review" && <button className="button button-secondary" onClick={onSaveAndExit}>Save &amp; Exit</button>}
+              <button className="button button-secondary" onClick={onStartNew}>Start New Interview</button>
+            </div>
+          </VoiceStateContent>
+        )}
+        {voiceState === "error" && (
+          <VoiceStateContent title="Something needs another try" subtitle="Your interview practice is still here. Check the message and try again." status="Ready" isContinuing={isContinuing} active={false}>
+            {voiceError && <p className="recording-error" role="alert">{voiceError}</p>}
+            <div className="voice-actions"><button className="button button-primary" onClick={onRestart}>Retry</button><button className="button button-secondary" onClick={onStartNew}>Start New Interview</button></div>
           </VoiceStateContent>
         )}
       </div>
@@ -73,6 +87,6 @@ export function VoiceWorkspace({ task, voiceState, resumeStep, correctionApplied
   );
 }
 
-function VoiceStateContent({ title, subtitle, active, children }: { title: string; subtitle: string; active: boolean; children: React.ReactNode }) {
-  return <><div className="voice-stage-header"><span className={`status-badge ${active ? "active" : ""}`}>{active ? "Voice active" : "Voice workspace"}</span><span className="prototype-label">Local simulation</span></div><h1 id="voice-title">{title}</h1><p className="voice-subtitle">{subtitle}</p><Waveform active={active} />{children}</>;
+function VoiceStateContent({ title, subtitle, status, isContinuing, active, children }: { title: string; subtitle: string; status: string; isContinuing: boolean; active: boolean; children: React.ReactNode }) {
+  return <><div className="voice-stage-header"><span className={`status-badge ${active ? "active" : ""}`}>{status}</span><span className="prototype-label">{isContinuing ? "Previous context restored" : "Fresh interview"}</span></div><h1 id="voice-title">{title}</h1><p className="voice-subtitle">{subtitle}</p><Waveform active={active} />{children}</>;
 }

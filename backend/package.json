@@ -1,0 +1,28 @@
+{
+  "name": "voxforge-backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch --import tsx src/server.ts",
+    "build": "tsc --project tsconfig.json",
+    "start": "node --env-file-if-exists=.env dist/backend/src/server.js",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "seed": "node --env-file-if-exists=.env --import tsx src/seed.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.19.0",
+    "express": "^5.2.1",
+    "groq-sdk": "^1.5.0",
+    "multer": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

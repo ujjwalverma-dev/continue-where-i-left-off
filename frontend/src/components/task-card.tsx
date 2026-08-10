@@ -10,17 +10,13 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
     <button className="task-card" onClick={onSelect} aria-label={`Open ${task.title}`}>
       <span className="task-card-top">
         <span className="task-card-icon" aria-hidden="true">↗</span>
-        <span className="status-badge active">In progress</span>
+        <span className="status-badge active">Practice ready</span>
       </span>
       <span>
         <h3>{task.title}</h3>
         <span className="task-description">{task.description}</span>
       </span>
-      <span className="task-card-footer">
-        <span className="progress-label"><span>Progress</span><span>{task.progress}%</span></span>
-        <span className="progress-track"><span className="progress-fill" style={{ width: `${task.progress}%` }} /></span>
-        <span className="unresolved-note">Next: {task.unresolvedSteps[0].label}</span>
-      </span>
+      <span className="task-card-footer task-card-action">Start a new practice scenario <span aria-hidden="true">→</span></span>
     </button>
   );
 }

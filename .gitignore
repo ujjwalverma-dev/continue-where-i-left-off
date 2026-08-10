@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.next/
+.env*
+!.env.example
+coverage/
+*.tsbuildinfo
+*.pem
+
+frontend/.next/
+frontend/frontend/.next/

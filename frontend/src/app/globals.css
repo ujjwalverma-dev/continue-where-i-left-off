@@ -34,6 +34,7 @@ button:focus-visible { outline: 3px solid #9ac6ba; outline-offset: 3px; }
 .site-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 56px; }
 .wordmark { display: inline-flex; align-items: center; gap: 9px; padding: 4px 0; border: 0; color: var(--ink); background: none; font-size: 18px; font-weight: 720; letter-spacing: -.04em; cursor: pointer; }
 .wordmark-mark { width: 15px; height: 15px; border: 4px solid var(--accent); border-top-color: transparent; border-radius: 50%; transform: rotate(-35deg); }
+.wordmark small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .prototype-label, .count-chip, .status-badge { display: inline-flex; align-items: center; width: fit-content; border-radius: 99px; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
 .prototype-label { padding: 6px 10px; border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,.55); }
 .home-view { display: grid; gap: 76px; }
@@ -52,7 +53,9 @@ h3 { margin-bottom: 8px; font-size: 18px; line-height: 1.2; letter-spacing: -.02
 .button-secondary:hover { background: var(--surface-muted); }
 .button-quiet { color: var(--muted); border: 0; background: transparent; }
 .button-icon { font-size: 21px; line-height: 0; }
+.home-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .helper-text { margin: 11px 0 0; color: var(--muted); font-size: 12px; }
+.local-continuity { max-width: 520px; margin: 12px 0 0; color: var(--accent); font-size: 13px; font-weight: 700; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .section-heading .eyebrow { margin-bottom: 7px; }
 .count-chip { padding: 6px 10px; color: var(--muted); background: var(--surface-muted); }
@@ -66,6 +69,7 @@ h3 { margin-bottom: 8px; font-size: 18px; line-height: 1.2; letter-spacing: -.02
 .status-badge.active { color: var(--accent); background: var(--accent-soft); }
 .task-description, .context-summary { color: var(--muted); font-size: 14px; line-height: 1.5; }
 .task-card-footer { width: 100%; margin-top: auto; padding-top: 19px; }
+.task-card-action { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
 .progress-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .progress-track { overflow: hidden; height: 5px; border-radius: 99px; background: var(--surface-muted); }
 .progress-fill { height: 100%; border-radius: inherit; background: var(--accent); }
@@ -116,6 +120,9 @@ h3 { margin-bottom: 8px; font-size: 18px; line-height: 1.2; letter-spacing: -.02
 .recording-playback { max-width: 580px; padding: 18px 20px; margin: -12px 0 28px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .recording-playback .response-label { margin-bottom: 10px; }
 .recording-playback audio { display: block; width: 100%; height: 36px; }
+.interview-details { display: grid; gap: 12px; max-width: 580px; margin: 0 0 28px; }
+.interview-details article { padding: 17px 19px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.interview-details article p:last-child { margin-bottom: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .correction-quote { max-width: 560px; padding: 17px 19px; margin: 28px 0; border: 1px solid #ecd4bb; border-radius: 9px; color: #70441e; background: #fff9f3; font-size: 16px; line-height: 1.5; }
 .correction-quote strong { display: block; margin-bottom: 4px; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
 .correction-flow { display: grid; gap: 0; max-width: 560px; margin: 25px 0 31px; }
@@ -137,6 +144,7 @@ h3 { margin-bottom: 8px; font-size: 18px; line-height: 1.2; letter-spacing: -.02
   .context-header .status-badge { margin-top: 14px; }
   .voice-stage { min-height: 480px; }
   .voice-stage-header { align-items: start; }
+  .home-actions .button { width: 100%; }
   .voice-actions .button { width: 100%; }
 }
 

@@ -2,53 +2,49 @@ import type { Task } from "@/types/task";
 
 type TaskContextProps = {
   task: Task;
+  isContinuing: boolean;
   onBack: () => void;
   onContinue: () => void;
+  onStartNew: () => void;
 };
 
-export function TaskContext({ task, onBack, onContinue }: TaskContextProps) {
+export function TaskContext({ task, isContinuing, onBack, onContinue, onStartNew }: TaskContextProps) {
   return (
     <section className="context-view" aria-labelledby="task-title">
-      <button className="back-button" onClick={onBack}>← All unfinished tasks</button>
+      <button className="back-button" onClick={onBack}>← Interview practice</button>
       <div className="context-header">
         <div>
-          <p className="eyebrow">Task context</p>
+          <p className="eyebrow">Interview practice</p>
           <h1 id="task-title">{task.title}</h1>
-          <p className="context-meta">{task.lastSession} · Last focus: {task.lastWorkedOn}</p>
+          <p className="context-meta">{task.role} · {task.interviewType} interview</p>
         </div>
-        <span className="status-badge active">Ready to resume</span>
+        <span className="status-badge active">{isContinuing ? "Previous context restored" : "Ready to practice"}</span>
       </div>
       <div className="context-layout">
         <div>
           <article className="panel">
-            <p className="panel-label">What matters from last time</p>
+            <p className="panel-label">This practice scenario</p>
             <p className="context-summary">{task.summary}</p>
           </article>
           <article className="panel">
-            <p className="panel-label">Progress</p>
-            <div className="progress-label"><span>{task.progress}% complete</span><span>{task.completedSteps.length} steps done</span></div>
-            <div className="progress-track"><div className="progress-fill" style={{ width: `${task.progress}%` }} /></div>
-          </article>
-          <article className="panel">
-            <p className="panel-label">Completed</p>
-            <ul className="steps">
-              {task.completedSteps.map((step) => <li className="step complete" key={step.id}><span className="step-marker">✓</span><span>{step.label}</span></li>)}
-            </ul>
+            <p className="panel-label">How the demo works</p>
+            <p className="context-summary">Speak your answer, then Continuum transcribes it, uses the interview context to prepare feedback and a follow-up, and speaks its response. Each exchange is turn-based.</p>
           </article>
         </div>
         <div>
           <article className="panel">
-            <p className="panel-label">Still unresolved</p>
-            <ul className="steps">
-              {task.unresolvedSteps.map((step) => <li className="step unresolved" key={step.id}><span className="step-marker">!</span><span>{step.label}</span></li>)}
-            </ul>
+            <p className="panel-label">{isContinuing ? "Continue where you left off" : "Start fresh"}</p>
+            <p className="context-summary">{isContinuing ? "Continuum will use your latest saved practice context when it is useful for your next answer. This is a resume point, not a full conversation history." : "Begin a new interview practice exchange with this scenario."}</p>
           </article>
           <article className="panel continue-card">
             <div>
-              <p className="panel-label">Continue by voice</p>
-              <p>Start naturally. The prototype will surface the previous context before the next decision.</p>
+              <p className="panel-label">Practice by voice</p>
+              <p>When you are ready, speak your answer. Continuum will respond when your turn is complete.</p>
             </div>
-            <button className="button button-primary" onClick={onContinue}>Continue task <span aria-hidden="true">→</span></button>
+            <div className="voice-actions">
+              <button className="button button-primary" onClick={onContinue}>{isContinuing ? "Continue interview" : "Start speaking"} <span aria-hidden="true">→</span></button>
+              {isContinuing && <button className="button button-secondary" onClick={onStartNew}>Start New Interview</button>}
+            </div>
           </article>
         </div>
       </div>

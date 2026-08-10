@@ -1,89 +1,311 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TaskCard } from "@/components/task-card";
 import { TaskContext } from "@/components/task-context";
 import { VoiceWorkspace } from "@/components/voice-workspace";
 import { mockTasks } from "@/data/mock-tasks";
-import { sendVoiceToBackend } from "@/lib/voice-client";
 import type { Task, VoiceState } from "@/types/task";
 
 type View = "home" | "context" | "voice";
+
+type PrototypeContinuityContext = {
+  role: string;
+  interviewType: string;
+  lastTranscript: string;
+  lastFeedback: string;
+  lastInterviewerResponse: string;
+  lastTopic: string;
+};
+
+type InterviewResult = {
+  interviewerResponse: string;
+  feedback: string;
+  score: number | null;
+  retrievedContext: Array<{ title: string; category: string; score: number }>;
+};
+
+const CONTINUITY_STORAGE_KEY = "continuum.prototype-continuity.v1";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function readContinuity(value: unknown): PrototypeContinuityContext | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const fields = ["role", "interviewType", "lastTranscript", "lastFeedback", "lastInterviewerResponse", "lastTopic"] as const;
+
+  if (fields.some((field) => typeof value[field] !== "string" || !value[field])) {
+    return null;
+  }
+
+  return {
+    role: value.role as string,
+    interviewType: value.interviewType as string,
+    lastTranscript: value.lastTranscript as string,
+    lastFeedback: value.lastFeedback as string,
+    lastInterviewerResponse: value.lastInterviewerResponse as string,
+    lastTopic: value.lastTopic as string,
+  };
+}
+
+function getStoredContinuitySnapshot(): string | null {
+  try {
+    return window.localStorage.getItem(CONTINUITY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function getServerContinuitySnapshot(): null {
+  return null;
+}
+
+function subscribeToContinuityStorage(onStoreChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === CONTINUITY_STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
+function parseStoredContinuity(value: string | null): PrototypeContinuityContext | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return readContinuity(JSON.parse(value));
+  } catch {
+    return null;
+  }
+}
+
+function parseInterviewResult(value: unknown): InterviewResult {
+  if (!isRecord(value) || typeof value.interviewerResponse !== "string" || typeof value.feedback !== "string") {
+    throw new Error("The interview coach returned an unexpected response.");
+  }
+
+  const score = value.score;
+  const retrievedContext = Array.isArray(value.retrievedContext)
+    ? value.retrievedContext.filter((item): item is { title: string; category: string; score: number } => (
+      isRecord(item) && typeof item.title === "string" && typeof item.category === "string" && typeof item.score === "number"
+    ))
+    : [];
+
+  if (score !== null && typeof score !== "number") {
+    throw new Error("The interview coach returned an invalid score.");
+  }
+
+  return {
+    interviewerResponse: value.interviewerResponse,
+    feedback: value.feedback,
+    score,
+    retrievedContext,
+  };
+}
+
+async function responseError(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    if (isRecord(body) && typeof body.error === "string") {
+      return body.error;
+    }
+  } catch {
+    // A provider error can be non-JSON; use a safe status-based fallback.
+  }
+
+  return `Request failed (${response.status}).`;
+}
 
 export default function Home() {
   const [view, setView] = useState<View>("home");
   const [selectedTask, setSelectedTask] = useState<Task>(mockTasks[0]);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
-  const [resumeStep, setResumeStep] = useState(0);
-  const [correctionApplied, setCorrectionApplied] = useState(false);
-  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const [isStartingRecording, setIsStartingRecording] = useState(false);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
+  const [interviewerResponse, setInterviewerResponse] = useState<string | null>(null);
+  const [responseAudio, setResponseAudio] = useState<Blob | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [savedResumePoint, setSavedResumePoint] = useState(false);
+  const [sessionContinuity, setSessionContinuity] = useState<PrototypeContinuityContext | null | undefined>(undefined);
+  const storedContinuity = useSyncExternalStore(
+    subscribeToContinuityStorage,
+    getStoredContinuitySnapshot,
+    getServerContinuitySnapshot,
+  );
+  // `undefined` means use the hydration-safe storage snapshot; `null` means this
+  // tab intentionally cleared its interview continuity.
+  const continuity = sessionContinuity === undefined ? parseStoredContinuity(storedContinuity) : sessionContinuity;
   const [isStoppingRecording, setIsStoppingRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const discardRecordingRef = useRef(false);
   const isStartingRecordingRef = useRef(false);
+  const interactionVersionRef = useRef(0);
 
   const releaseMicrophone = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
   }, []);
 
+  const markAutoplayBlocked = useCallback(() => {
+    setAutoplayBlocked(true);
+  }, []);
+
   useEffect(() => releaseMicrophone, [releaseMicrophone]);
 
-  useEffect(() => {
-    if (voiceState === "processing") {
-      const timeout = window.setTimeout(() => {
-        setResumeStep(0);
-        setVoiceState("resuming");
-      }, 750);
+  const synthesizeResponse = useCallback(async (text: string): Promise<Blob> => {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
 
-      return () => window.clearTimeout(timeout);
+    if (!response.ok) {
+      throw new Error(await responseError(response));
     }
 
-    if (voiceState === "resuming") {
-      const timeout = window.setTimeout(() => {
-        if (resumeStep === 3) {
-          setVoiceState("speaking");
-        } else {
-          setResumeStep((current) => current + 1);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("audio/")) {
+      throw new Error("The voice provider returned an invalid audio response.");
+    }
+
+    const audio = await response.blob();
+    if (audio.size === 0) {
+      throw new Error("The voice provider returned empty audio.");
+    }
+
+    return audio;
+  }, []);
+
+  const processRecording = useCallback(async (audio: Blob, interactionVersion: number) => {
+    if (interactionVersion !== interactionVersionRef.current) {
+      return;
+    }
+
+    setVoiceState("processing");
+    setVoiceError(null);
+    setTtsError(null);
+    setAutoplayBlocked(false);
+    setResponseAudio(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", audio, "interview-answer.webm");
+      const sttResponse = await fetch("/api/stt", { method: "POST", body: formData });
+
+      if (!sttResponse.ok) {
+        throw new Error(await responseError(sttResponse));
+      }
+
+      const sttBody: unknown = await sttResponse.json();
+      if (!isRecord(sttBody) || typeof sttBody.transcript !== "string" || !sttBody.transcript.trim()) {
+        throw new Error("Speech-to-text returned an invalid transcript.");
+      }
+
+      const capturedTranscript = sttBody.transcript.trim();
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+      setTranscript(capturedTranscript);
+
+      const interviewResponse = await fetch("/api/interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: capturedTranscript,
+          role: selectedTask.role,
+          interviewType: selectedTask.interviewType,
+          previousContext: continuity ?? undefined,
+        }),
+      });
+
+      if (!interviewResponse.ok) {
+        throw new Error(await responseError(interviewResponse));
+      }
+
+      const interview = parseInterviewResult(await interviewResponse.json());
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+      setInterviewerResponse(interview.interviewerResponse);
+      setFeedback(interview.feedback);
+      setScore(interview.score);
+
+      const nextContinuity: PrototypeContinuityContext = {
+        role: selectedTask.role,
+        interviewType: selectedTask.interviewType,
+        lastTranscript: capturedTranscript,
+        lastFeedback: interview.feedback,
+        lastInterviewerResponse: interview.interviewerResponse,
+        lastTopic: interview.retrievedContext[0]?.title ?? `${selectedTask.interviewType} interview practice`,
+      };
+      window.localStorage.setItem(CONTINUITY_STORAGE_KEY, JSON.stringify(nextContinuity));
+      setSessionContinuity(nextContinuity);
+
+      try {
+        const ttsAudio = await synthesizeResponse(interview.interviewerResponse);
+        if (interactionVersion !== interactionVersionRef.current) {
+          return;
         }
-      }, 620);
+        setResponseAudio(ttsAudio);
+      } catch (error) {
+        if (interactionVersion !== interactionVersionRef.current) {
+          return;
+        }
+        setTtsError(error instanceof Error ? error.message : "The spoken response could not be generated.");
+      }
 
-      return () => window.clearTimeout(timeout);
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+      setVoiceState("speaking");
+    } catch (error) {
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+      setVoiceError(error instanceof Error ? error.message : "The interview response could not be completed.");
+      setVoiceState("error");
     }
-  }, [resumeStep, voiceState]);
-
-  const chooseTask = (task: Task) => {
-    setSelectedTask(task);
-    setCorrectionApplied(false);
-    setVoiceState("idle");
-    setView("context");
-  };
+  }, [continuity, selectedTask.interviewType, selectedTask.role, synthesizeResponse]);
 
   const startSpeaking = async () => {
     if (isStartingRecordingRef.current || recorderRef.current?.state === "recording") {
       return;
     }
 
-    setCorrectionApplied(false);
-    setRecordingError(null);
+    const interactionVersion = interactionVersionRef.current;
+    setView("voice");
+    setVoiceError(null);
+    setTtsError(null);
+    setAutoplayBlocked(false);
     isStartingRecordingRef.current = true;
-    setIsStartingRecording(true);
 
     if (!navigator.mediaDevices?.getUserMedia || !("MediaRecorder" in window)) {
-      setRecordingError("Microphone recording is not supported by this browser. Try a current desktop browser.");
-      setVoiceState("idle");
-      setView("voice");
+      setVoiceError("Microphone recording is not supported by this browser. Try a current desktop browser.");
+      setVoiceState("error");
       isStartingRecordingRef.current = false;
-      setIsStartingRecording(false);
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (interactionVersion !== interactionVersionRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       streamRef.current = stream;
       chunksRef.current = [];
       discardRecordingRef.current = false;
@@ -98,7 +320,7 @@ export default function Home() {
       };
 
       recorder.onstop = () => {
-        const audioBlob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        const recording = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const shouldDiscard = discardRecordingRef.current;
 
         chunksRef.current = [];
@@ -107,32 +329,31 @@ export default function Home() {
         releaseMicrophone();
         setIsStoppingRecording(false);
 
-        if (shouldDiscard) {
+        if (shouldDiscard || interactionVersion !== interactionVersionRef.current) {
           return;
         }
 
-        if (audioBlob.size === 0) {
-          setRecordingError("No audio was captured. Check your microphone and try again.");
-          setVoiceState("idle");
+        if (recording.size === 0) {
+          setVoiceError("No audio was captured. Check your microphone and try again.");
+          setVoiceState("error");
           return;
         }
 
-        setRecordedAudio(audioBlob);
-        setVoiceState("processing");
-        void sendVoiceToBackend(audioBlob);
+        void processRecording(recording, interactionVersion);
       };
 
       recorder.start();
       setVoiceState("listening");
-      setView("voice");
     } catch {
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+
       releaseMicrophone();
-      setRecordingError("Microphone access was not granted. Allow access and try again.");
-      setVoiceState("idle");
-      setView("voice");
+      setVoiceError("Microphone access was not granted. Allow access and try again.");
+      setVoiceState("error");
     } finally {
       isStartingRecordingRef.current = false;
-      setIsStartingRecording(false);
     }
   };
 
@@ -148,6 +369,7 @@ export default function Home() {
   };
 
   const cancelRecording = () => {
+    interactionVersionRef.current += 1;
     const recorder = recorderRef.current;
 
     if (recorder) {
@@ -162,86 +384,158 @@ export default function Home() {
     }
 
     setVoiceState("idle");
+    setIsStoppingRecording(false);
   };
 
-  const applyCorrection = () => {
-    setCorrectionApplied(true);
-    setVoiceState("speaking");
+  const resetInterviewState = () => {
+    setVoiceState("idle");
+    setTranscript(null);
+    setFeedback(null);
+    setScore(null);
+    setInterviewerResponse(null);
+    setResponseAudio(null);
+    setVoiceError(null);
+    setTtsError(null);
+    setAutoplayBlocked(false);
+  };
+
+  const startNewInterview = (task: Task = mockTasks[0]) => {
+    cancelRecording();
+    window.localStorage.removeItem(CONTINUITY_STORAGE_KEY);
+    setSessionContinuity(null);
+    setSavedResumePoint(false);
+    setSelectedTask(task);
+    resetInterviewState();
+    setView("context");
+  };
+
+  const continuePreviousInterview = () => {
+    const matchingTask = continuity
+      ? mockTasks.find((task) => task.role === continuity.role && task.interviewType === continuity.interviewType)
+      : undefined;
+
+    cancelRecording();
+    setSavedResumePoint(false);
+    setSelectedTask(matchingTask ?? mockTasks[0]);
+    resetInterviewState();
+    setView("context");
+  };
+
+  const retryAudio = async () => {
+    if (!interviewerResponse) {
+      return;
+    }
+
+    const interactionVersion = interactionVersionRef.current;
+    setTtsError(null);
+    setAutoplayBlocked(false);
+
+    try {
+      const audio = await synthesizeResponse(interviewerResponse);
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+      setResponseAudio(audio);
+    } catch (error) {
+      if (interactionVersion !== interactionVersionRef.current) {
+        return;
+      }
+      setTtsError(error instanceof Error ? error.message : "The spoken response could not be generated.");
+    }
+  };
+
+  const chooseTask = (task: Task) => {
+    startNewInterview(task);
   };
 
   const returnHome = () => {
     cancelRecording();
+    setSavedResumePoint(false);
     setView("home");
   };
+
+  const saveAndExit = () => {
+    cancelRecording();
+    setSavedResumePoint(true);
+    setView("home");
+  };
+
+  const handleAudioEnded = useCallback(() => {
+    setAutoplayBlocked(false);
+    setVoiceState((currentState) => currentState === "speaking" ? "review" : currentState);
+  }, []);
 
   return (
     <main className="app-shell">
       <header className="site-header">
-        <button className="wordmark" onClick={returnHome} aria-label="Return to task list">
+        <button className="wordmark" onClick={returnHome} aria-label="Return to interview practice">
           <span className="wordmark-mark" aria-hidden="true" />
-          Continue
+          <span>CONTINUUM<small>Never Start From Zero</small></span>
         </button>
-        <span className="prototype-label">Prototype</span>
+        <span className="prototype-label">Interview prototype</span>
       </header>
 
       {view === "home" && (
         <section className="home-view" aria-labelledby="home-title">
           <div className="home-intro">
-            <p className="eyebrow">Task continuity, without the recap</p>
-            <h1 id="home-title">Pick up useful work exactly where it paused.</h1>
-            <p className="lead">
-              Continue keeps the important decisions, progress, and open questions close at hand—so
-              your next step is already clear.
-            </p>
-            <button className="button button-primary" onClick={startSpeaking} disabled={isStartingRecording}>
-              <span className="button-icon" aria-hidden="true">⌁</span>
-              Start speaking
-            </button>
-            <p className="helper-text">Simulated voice interaction for this prototype</p>
+            <p className="eyebrow">Context that carries forward</p>
+            <h1 id="home-title">Never Start From Zero.</h1>
+            <p className="lead">Continuum preserves the useful context from your most recent interaction, so the next conversation can continue naturally without rebuilding everything from scratch.</p>
+            <div className="home-actions">
+              {continuity ? (
+                <>
+                  <button className="button button-primary" onClick={continuePreviousInterview}>Continue Where I Left Off <span aria-hidden="true">→</span></button>
+                  <button className="button button-secondary" onClick={() => startNewInterview()}>Start New Interview</button>
+                </>
+              ) : (
+                <button className="button button-primary" onClick={() => startNewInterview()}>Start New Interview <span aria-hidden="true">→</span></button>
+              )}
+            </div>
+            <p className="helper-text">After a completed turn, your latest practice context is saved in this browser as a resume point—not a full conversation history.</p>
+            {continuity && <p className="local-continuity">{savedResumePoint ? "Your latest resume point was saved." : "Previous context restored from your latest completed practice turn."}</p>}
           </div>
 
           <div className="task-list-section">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Your work</p>
-                <h2>Unfinished tasks</h2>
+                <p className="eyebrow">See Continuum in action</p>
+                <h2>Interview practice is the current demonstration</h2>
               </div>
-              <span className="count-chip">{mockTasks.length} active</span>
             </div>
             <div className="task-grid">
-              {mockTasks.map((task) => (
-                <TaskCard key={task.id} task={task} onSelect={() => chooseTask(task)} />
-              ))}
+              {mockTasks.map((task) => <TaskCard key={task.id} task={task} onSelect={() => chooseTask(task)} />)}
             </div>
           </div>
         </section>
       )}
 
-      {view === "context" && (
-        <TaskContext
-          task={selectedTask}
-          onBack={returnHome}
-          onContinue={startSpeaking}
-        />
-      )}
+      {view === "context" && <TaskContext task={selectedTask} isContinuing={Boolean(continuity)} onBack={returnHome} onContinue={() => void startSpeaking()} onStartNew={startNewInterview} />}
 
       {view === "voice" && (
         <VoiceWorkspace
           task={selectedTask}
           voiceState={voiceState}
-          resumeStep={resumeStep}
-          correctionApplied={correctionApplied}
-          recordedAudio={recordedAudio}
-          recordingError={recordingError}
+          transcript={transcript}
+          feedback={feedback}
+          score={score}
+          interviewerResponse={interviewerResponse}
+          responseAudio={responseAudio}
+          voiceError={voiceError}
+          ttsError={ttsError}
+          autoplayBlocked={autoplayBlocked}
           isStoppingRecording={isStoppingRecording}
+          isContinuing={Boolean(continuity)}
           onBack={() => {
             cancelRecording();
             setView("context");
           }}
+          onStartNew={startNewInterview}
           onFinishSpeaking={finishSpeaking}
-          onInterrupt={() => setVoiceState("interrupted")}
-          onApplyCorrection={applyCorrection}
           onRestart={() => void startSpeaking()}
+          onRetryAudio={() => void retryAudio()}
+          onAutoplayBlocked={markAutoplayBlocked}
+          onAudioEnded={handleAudioEnded}
+          onSaveAndExit={saveAndExit}
         />
       )}
     </main>

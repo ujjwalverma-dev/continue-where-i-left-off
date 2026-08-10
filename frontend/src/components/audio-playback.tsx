@@ -3,10 +3,13 @@
 import { useEffect, useRef } from "react";
 
 type AudioPlaybackProps = {
-  source: Blob | string | null;
+  source: Blob | null;
+  autoPlay?: boolean;
+  onAutoplayBlocked?: () => void;
+  onEnded?: () => void;
 };
 
-export function AudioPlayback({ source }: AudioPlaybackProps) {
+export function AudioPlayback({ source, autoPlay = false, onAutoplayBlocked, onEnded }: AudioPlaybackProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -16,16 +19,21 @@ export function AudioPlayback({ source }: AudioPlaybackProps) {
       return;
     }
 
-    const audioUrl = typeof source === "string" ? source : URL.createObjectURL(source);
+    const audioUrl = URL.createObjectURL(source);
     audio.src = audioUrl;
     audio.load();
 
+    if (autoPlay) {
+      void audio.play().catch(() => onAutoplayBlocked?.());
+    }
+
     return () => {
-      if (typeof source !== "string") {
-        URL.revokeObjectURL(audioUrl);
-      }
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      URL.revokeObjectURL(audioUrl);
     };
-  }, [source]);
+  }, [autoPlay, onAutoplayBlocked, source]);
 
   if (!source) {
     return null;
@@ -33,8 +41,8 @@ export function AudioPlayback({ source }: AudioPlaybackProps) {
 
   return (
     <div className="recording-playback">
-      <p className="response-label">Latest recording</p>
-      <audio ref={audioRef} controls>
+      <p className="response-label">Interviewer audio</p>
+      <audio ref={audioRef} controls onEnded={onEnded}>
         Your browser does not support audio playback.
       </audio>
     </div>
