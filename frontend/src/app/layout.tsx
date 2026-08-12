@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Continue — task continuity",
-  description: "A local visual prototype for continuing unfinished work.",
+  title: "Continuum — Never Start From Zero",
+  description: "An AI voice experience that remembers context so you never have to start from zero.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
