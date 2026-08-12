@@ -32,10 +32,6 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-!.env.example
-
-# Generated from the existing backend source before Next.js builds its API route.
-.api-dist/
 
 # vercel
 .vercel
