@@ -60,8 +60,8 @@ Start a new chat without carrying forward previous context
 
 
 Repository Structure
-frontend/     Next.js / React application
-backend/      Node.js / TypeScript API
+frontend/     Next.js / React application and unified API deployment
+backend/      Node.js / Express API source, local entrypoint, and seed utility
 shared/       Shared TypeScript contracts
 
 
@@ -76,15 +76,15 @@ Rime API key
 git clone <YOUR_GITHUB_REPOSITORY_URL>
 cd <REPOSITORY_DIRECTORY>
 
-2. Configure the backend
+2. Configure the unified application
 
 Create:
 
-backend/.env
+frontend/.env.local
 
 using:
 
-backend/.env.example
+frontend/.env.example
 
 Add:
 
@@ -94,26 +94,9 @@ QDRANT_API_KEY=
 LLM_API_KEY=
 STT_API_KEY=
 
-PORT=4000
-FRONTEND_ORIGIN=http://localhost:3000
+Never commit the real .env.local file or use a NEXT_PUBLIC_ prefix for provider keys.
 
-Never commit the real .env file.
-
-3. Start the backend
-cd backend
-npm install
-npm run dev
-
-Backend:
-
-http://localhost:4000
-
-Health check:
-
-http://localhost:4000/health
-4. Start the frontend
-
-Open another terminal:
+3. Start the application
 
 cd frontend
 npm install
@@ -122,6 +105,10 @@ npm run dev
 Open:
 
 http://localhost:3000
+
+Health check:
+
+http://localhost:3000/health
 Qdrant Knowledge Base
 
 The prototype uses a small synthetic interview-preparation dataset in Qdrant.
@@ -130,6 +117,8 @@ To seed the collection:
 
 cd backend
 npm run seed
+
+The seed utility remains a local backend command and reads backend/.env. Use the same provider values that are configured in frontend/.env.local; this is not part of the Vercel deployment.
 
 The retrieval endpoint can be tested with:
 
@@ -145,15 +134,20 @@ Validation
 
 The project has been validated with:
 
-cd backend
-npm run typecheck
+cd frontend
 npm run build
 
-cd ../frontend
-npm run lint
-npm run build
+The build first compiles the unchanged backend source for the unified API route, then creates the Next.js production deployment.
 
-The local end-to-end flow has also been tested:
+Vercel deployment
+
+1. Import this repository as one Vercel project.
+2. Set Root Directory to frontend and leave the Framework Preset as Next.js.
+3. Use the default install command (npm install) and build command (npm run build).
+4. Add RIME_API_KEY, QDRANT_URL, QDRANT_API_KEY, LLM_API_KEY, and STT_API_KEY in Vercel Environment Variables for the environments you deploy.
+5. Deploy. The frontend and API share one production URL; do not set BACKEND_URL, PORT, or FRONTEND_ORIGIN for this deployment.
+
+The local end-to-end flow is:
 
 Microphone
    ↓
