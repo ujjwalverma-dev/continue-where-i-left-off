@@ -1,10 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { TaskCard } from "@/components/task-card";
+import { ArchitectureDiagramSection } from "@/components/continuum/architecture-diagram";
+import { BrainNeuralBackground } from "@/components/brain-neural-background";
+import { ContinuityStorySection } from "@/components/continuum/continuity-story";
+import { FinalCTASection } from "@/components/continuum/final-cta";
+import { HeroSection } from "@/components/continuum/hero";
+import { HypothesisSection } from "@/components/continuum/hypothesis-section";
+import { MentalHealthModeDemo } from "@/components/continuum/mental-health-mode-demo";
+import { ProblemChecklistSection } from "@/components/continuum/problem-checklist";
+import { ProblemInterruptionSection } from "@/components/continuum/problem-interruption";
+import { ProductLoopSection } from "@/components/continuum/product-loop";
+import { TalkingToAISection } from "@/components/continuum/talking-to-ai";
+import { VoiceStatesVisualSection } from "@/components/continuum/voice-states-visual";
+import { WhyThisMattersSection } from "@/components/continuum/why-this-matters";
 import { TaskContext } from "@/components/task-context";
 import { VoiceWorkspace } from "@/components/voice-workspace";
 import { mockTasks } from "@/data/mock-tasks";
+import { useParallax } from "@/lib/use-parallax";
 import type { Task, VoiceState } from "@/types/task";
 
 type View = "home" | "context" | "voice";
@@ -143,8 +156,6 @@ export default function Home() {
     getStoredContinuitySnapshot,
     getServerContinuitySnapshot,
   );
-  // `undefined` means use the hydration-safe storage snapshot; `null` means this
-  // tab intentionally cleared its interview continuity.
   const continuity = sessionContinuity === undefined ? parseStoredContinuity(storedContinuity) : sessionContinuity;
   const [isStoppingRecording, setIsStoppingRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -465,79 +476,112 @@ export default function Home() {
     setVoiceState((currentState) => currentState === "speaking" ? "review" : currentState);
   }, []);
 
+  const parallax = useParallax(view === "home");
+  const scrollToExplore = () => {
+    window.scrollTo({ top: window.innerHeight * 0.75, behavior: "smooth" });
+  };
+
   return (
-    <main className="app-shell">
-      <header className="site-header">
-        <button className="wordmark" onClick={returnHome} aria-label="Return to interview practice">
-          <span className="wordmark-mark" aria-hidden="true" />
-          <span>CONTINUUM<small>Never Start From Zero</small></span>
-        </button>
-        <span className="prototype-label">Interview prototype</span>
-      </header>
+    <>
+      {/* Background Ambient Brain Neural Parallax Canvas */}
+      <BrainNeuralBackground parallax={parallax} />
 
-      {view === "home" && (
-        <section className="home-view" aria-labelledby="home-title">
-          <div className="home-intro">
-            <p className="eyebrow">Context that carries forward</p>
-            <h1 id="home-title">Never Start From Zero.</h1>
-            <p className="lead">Continuum preserves the useful context from your most recent interaction, so the next conversation can continue naturally without rebuilding everything from scratch.</p>
-            <div className="home-actions">
-              {continuity ? (
-                <>
-                  <button className="button button-primary" onClick={continuePreviousInterview}>Continue Where I Left Off <span aria-hidden="true">→</span></button>
-                  <button className="button button-secondary" onClick={() => startNewInterview()}>Start New Chat</button>
-                </>
-              ) : (
-                <button className="button button-primary" onClick={() => startNewInterview()}>Start New Interview <span aria-hidden="true">→</span></button>
-              )}
-            </div>
-            <p className="helper-text">After a completed turn, your latest practice context is saved in this browser as a resume point—not a full conversation history.</p>
-            {continuity && <p className="local-continuity">{savedResumePoint ? "Your latest resume point was saved." : "Previous context restored from your latest completed practice turn."}</p>}
+      <main className="app-shell">
+        <header className="site-header">
+          <button className="wordmark" onClick={returnHome} aria-label="Return to landing page">
+            <span className="wordmark-mark" aria-hidden="true" />
+            <span>CONTINUUM<small>Never Start From Zero</small></span>
+          </button>
+          <span className="prototype-label">Voice-first prototype</span>
+        </header>
+
+        {view === "home" && (
+          <div className="narrative-flow">
+            {/* SECTION 1 — Hero */}
+            <HeroSection
+              parallax={parallax}
+              onStartTalking={continuity ? continuePreviousInterview : () => startNewInterview()}
+              onExplore={scrollToExplore}
+              savedResumePoint={savedResumePoint}
+            />
+
+            {/* SECTION 2 — Why This Matters */}
+            <WhyThisMattersSection parallax={parallax} />
+
+            {/* SECTION 3 — People Are Already Talking to AI */}
+            <TalkingToAISection parallax={parallax} />
+
+            {/* SECTION 4 — Problem 1: AI Responds Too Soon */}
+            <ProblemInterruptionSection parallax={parallax} />
+
+            {/* SECTION 5 — Problem 2: Solutions Before Understanding */}
+            <ProblemChecklistSection parallax={parallax} />
+
+            {/* SECTION 6 — Core Feature: Mental Health Mode Interactive Demo */}
+            <MentalHealthModeDemo />
+
+            {/* SECTION 7 — Voice Orb Visual Language */}
+            <VoiceStatesVisualSection />
+
+            {/* SECTION 8 — Continuity & Memory */}
+            <ContinuityStorySection parallax={parallax} />
+
+            {/* SECTION 9 — System Architecture */}
+            <ArchitectureDiagramSection parallax={parallax} />
+
+            {/* SECTION 10 — Product Loop & Why Voice */}
+            <ProductLoopSection parallax={parallax} />
+
+            {/* SECTION 11 — Product Hypothesis */}
+            <HypothesisSection />
+
+            {/* SECTION 12 — Final CTA & Reflection Scenario Launcher */}
+            <FinalCTASection
+              onStartTalking={continuity ? continuePreviousInterview : () => startNewInterview()}
+              onSelectTask={chooseTask}
+              continuityActive={Boolean(continuity)}
+            />
           </div>
+        )}
 
-          <div className="task-list-section">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">See Continuum in action</p>
-                <h2>Interview practice is the current demonstration</h2>
-              </div>
-            </div>
-            <div className="task-grid">
-              {mockTasks.map((task) => <TaskCard key={task.id} task={task} onSelect={() => chooseTask(task)} />)}
-            </div>
-          </div>
-        </section>
-      )}
+        {view === "context" && (
+          <TaskContext
+            task={selectedTask}
+            isContinuing={Boolean(continuity)}
+            onBack={returnHome}
+            onContinue={() => void startSpeaking()}
+            onStartNew={startNewInterview}
+          />
+        )}
 
-      {view === "context" && <TaskContext task={selectedTask} isContinuing={Boolean(continuity)} onBack={returnHome} onContinue={() => void startSpeaking()} onStartNew={startNewInterview} />}
-
-      {view === "voice" && (
-        <VoiceWorkspace
-          task={selectedTask}
-          voiceState={voiceState}
-          transcript={transcript}
-          feedback={feedback}
-          score={score}
-          interviewerResponse={interviewerResponse}
-          responseAudio={responseAudio}
-          voiceError={voiceError}
-          ttsError={ttsError}
-          autoplayBlocked={autoplayBlocked}
-          isStoppingRecording={isStoppingRecording}
-          isContinuing={Boolean(continuity)}
-          onBack={() => {
-            cancelRecording();
-            setView("context");
-          }}
-          onStartNew={startNewInterview}
-          onFinishSpeaking={finishSpeaking}
-          onRestart={() => void startSpeaking()}
-          onRetryAudio={() => void retryAudio()}
-          onAutoplayBlocked={markAutoplayBlocked}
-          onAudioEnded={handleAudioEnded}
-          onSaveAndExit={saveAndExit}
-        />
-      )}
-    </main>
+        {view === "voice" && (
+          <VoiceWorkspace
+            task={selectedTask}
+            voiceState={voiceState}
+            transcript={transcript}
+            feedback={feedback}
+            score={score}
+            interviewerResponse={interviewerResponse}
+            responseAudio={responseAudio}
+            voiceError={voiceError}
+            ttsError={ttsError}
+            autoplayBlocked={autoplayBlocked}
+            isStoppingRecording={isStoppingRecording}
+            isContinuing={Boolean(continuity)}
+            onBack={() => {
+              cancelRecording();
+              setView("context");
+            }}
+            onStartNew={startNewInterview}
+            onFinishSpeaking={finishSpeaking}
+            onRestart={() => void startSpeaking()}
+            onRetryAudio={() => void retryAudio()}
+            onAutoplayBlocked={markAutoplayBlocked}
+            onAudioEnded={handleAudioEnded}
+            onSaveAndExit={saveAndExit}
+          />
+        )}
+      </main>
+    </>
   );
 }
