@@ -14,8 +14,6 @@ Product Demo
 
 Full Demo
 
-""Continuum Demo" (https://img.youtube.com/vi/kdfuuF3q84I/maxresdefault.jpg)" (https://youtu.be/kdfuuF3q84I?si=8-CXvzG-yIL7cQYh)
-
 "Watch the full Continuum demo on YouTube" (https://youtu.be/kdfuuF3q84I?si=8-CXvzG-yIL7cQYh)
 
 The demo shows the working voice interaction and the current Continuum experience.
