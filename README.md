@@ -1,6 +1,3 @@
-# Continuum — Never Start From Zero
-#Website_Link - https://continuum-voice.vercel.app/
-
 
 **StarForge 2026 — VoxForge**  
 **Team: Binary Brains**
@@ -14,6 +11,10 @@ Interview practice is the current demonstration use case.
 Existing AI assistants can remember conversations, but users can still lose the useful context of an unfinished task and have to reconstruct what they were doing.
 
 Continuum focuses on preserving the **latest useful interaction context** so users can return and continue.
+
+# Continuum — Never Start From Zero
+#Website_Link - https://continuum-voice.vercel.app/
+
 
 ## How It Works
 
@@ -181,6 +182,13 @@ Current Scope
 Continuum is a working prototype, not a production multi-user system.
 
 The current implementation preserves the latest useful interaction context. Future versions could add persistent accounts, richer task memory, additional task types, and production-scale multi-user storage.
+
+Credits -
+🤝 Pathway  
+🤝 Rime  
+🤝 Weya  
+🤝 Qdrant
+
 
 Team
 
